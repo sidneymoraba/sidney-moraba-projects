@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Task Tracker</title>
+<style>
+:root{--ink:#0b1420;--panel:#101c2c;--line:#1d2d44;--text:#d6e2ef;--muted:#8aa0b8;--cyan:#22d3ee;--blue:#4f6fe0;--grad:linear-gradient(135deg,#22d3ee,#4f6fe0);--bad:#f87171}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;padding:24px 16px 48px}
+main{max-width:1000px;margin:0 auto}
+h1{font-weight:300;font-size:2rem;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:var(--muted);margin:4px 0 22px}
+.bar,.add{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:end}
+label{display:block;color:var(--muted);font-size:.9rem;margin-bottom:4px}
+input,select,button{font:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+button{cursor:pointer}.go{background:var(--grad);color:var(--ink);border:0;font-weight:600}
+.add{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}.add .t{flex:1 1 220px}.add .t input{width:100%}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.col{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;min-height:140px}
+.col h2{font-size:1rem;font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between}
+.col h2 span{color:var(--muted)}
+.task{background:var(--ink);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.task small{display:block;color:var(--muted)}.task .hi{color:var(--bad)}.task .md{color:var(--cyan)}
+.acts{display:flex;gap:6px;margin-top:8px}.acts button{padding:3px 10px;font-size:.85rem}
+.empty{color:var(--muted);font-size:.92rem}
+@media(max-width:760px){.board{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>Project Task Tracker</h1>
+<p class="sub">Keep each project’s tasks moving from To do to Done. Your data stays in this browser.</p>
+
+<div class="bar">
+ <div><label for="proj">Project</label><select id="proj"></select></div>
+ <div><label for="np">New project</label><input id="np" maxlength="40" placeholder="Project name"></div>
+ <button id="addp" type="button">Add project</button>
+</div>
+
+<form class="add" id="f">
+ <div class="t"><label for="title">Task</label><input id="title" required maxlength="80" placeholder="What needs doing?"></div>
+ <div><label for="pr">Priority</label><select id="pr"><option>High</option><option selected>Medium</option><option>Low</option></select></div>
+ <div><label for="due">Due date</label><input id="due" type="date"></div>
+ <button class="go" type="submit">Add task</button>
+</form>
+
+<div class="board" id="board"></div>
+</main>
+<script>
+(function(){
+var KEY="sm-tasks-v1",COLS=[["todo","To do"],["doing","In progress"],["done","Done"]];
+var S={projects:[{id:1,name:"My first project"}],tasks:[],cur:1};
+try{var r=JSON.parse(localStorage.getItem(KEY));if(r&&r.projects&&r.projects.length&&Array.isArray(r.tasks))S=r}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function $(i){return document.getElementById(i)}
+function el(t,txt,cls){var e=document.createElement(t);if(txt!=null)e.textContent=txt;if(cls)e.className=cls;return e}
+$("addp").onclick=function(){var n=$("np").value.trim();if(!n)return;var id=Date.now();S.projects.push({id:id,name:n});S.cur=id;$("np").value="";save();draw()};
+$("proj").onchange=function(){S.cur=+this.value;save();draw()};
+$("f").onsubmit=function(e){e.preventDefault();
+ S.tasks.push({id:Date.now(),pid:S.cur,t:$("title").value.trim(),p:$("pr").value,due:$("due").value,s:"todo"});
+ this.reset();$("pr").value="Medium";save();draw();$("title").focus()};
+function move(t,d){var i=COLS.findIndex(function(c){return c[0]===t.s})+d;if(i<0||i>2)return;t.s=COLS[i][0];save();draw()}
+function draw(){
+ var sel=$("proj");sel.textContent="";
+ S.projects.forEach(function(p){var o=el("option",p.name);o.value=p.id;if(p.id===S.cur)o.selected=true;sel.appendChild(o)});
+ var b=$("board");b.textContent="";
+ COLS.forEach(function(c){
+  var list=S.tasks.filter(function(t){return t.pid===S.cur&&t.s===c[0]});
+  var col=el("section",null,"col"),h=el("h2",c[1]);h.appendChild(el("span",String(list.length)));col.appendChild(h);
+  if(!list.length)col.appendChild(el("p","Nothing here yet.","empty"));
+  list.forEach(function(t){
+   var k=el("div",null,"task");k.appendChild(el("b",t.t));
+   k.appendChild(el("small",t.p+" priority"+(t.due?" · due "+t.due:""),t.p==="High"?"hi":t.p==="Medium"?"md":""));
+   var a=el("div",null,"acts");
+   if(c[0]!=="todo"){var l=el("button","←");l.setAttribute("aria-label","Move back");l.onclick=function(){move(t,-1)};a.appendChild(l)}
+   if(c[0]!=="done"){var r=el("button","→");r.setAttribute("aria-label","Move forward");r.onclick=function(){move(t,1)};a.appendChild(r)}
+   var d=el("button","Delete");d.onclick=function(){S.tasks=S.tasks.filter(function(x){return x.id!==t.id});save();draw()};a.appendChild(d);
+   k.appendChild(a);col.appendChild(k)});
+  b.appendChild(col)});
+}
+draw();
+})();
+</script></body></html>
